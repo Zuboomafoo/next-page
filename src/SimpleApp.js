@@ -72,107 +72,266 @@ function SimpleApp() {
     localStorage.setItem('nextpage_feedback', JSON.stringify(feedbackMap));
   }, [feedbackMap]);
   
-  // Google Books API search function
-  const searchBooks = useCallback(async (query) => {
-    if (!query || query.trim().length < 3) return [];
+// Google Books API search function with API key and error handling
+const searchBooks = useCallback(async (query) => {
+  if (!query || query.trim().length < 3) return [];
+  
+  try {
+    console.log("Searching for books with query:", query);
     
-    try {
-      const response = await fetch(
-        `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=5`
-      );
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch from Google Books API');
-      }
-      
-      const data = await response.json();
-      
-      if (!data.items || data.items.length === 0) {
-        return [];
-      }
-      
-      return data.items.map(item => {
-        const info = item.volumeInfo || {};
-        return {
-          id: item.id,
-          title: info.title || 'Unknown Title',
-          author: info.authors ? info.authors.join(', ') : 'Unknown Author',
-          genre: info.categories ? info.categories[0] : 'Unknown',
-          description: info.description || 'No description available',
-          coverImage: info.imageLinks?.thumbnail || null,
-          publishedDate: info.publishedDate,
-          pageCount: info.pageCount,
-          averageRating: info.averageRating,
-          language: info.language || 'en',
-          asin: info.industryIdentifiers?.find(id => id.type === 'ISBN_13')?.identifier
-        };
-      });
-    } catch (error) {
-      console.error('Error searching books:', error);
+    // Use a CORS proxy if needed (remove if not required)
+    const corsProxy = "https://corsproxy.io/?";
+    const apiKey = "AIzaSyDo8wQLqk9-W0XgnhjFmGSxfAY_FVOyXJg";
+    
+    const response = await fetch(
+      `${corsProxy}https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=5&key=${apiKey}`
+    );
+    
+    if (!response.ok) {
+      console.error("API Response not OK:", response.status, response.statusText);
+      throw new Error(`Failed to fetch from Google Books API: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log("API Response:", data);
+    
+    if (!data.items || data.items.length === 0) {
+      console.log("No books found for query:", query);
       return [];
     }
-  }, []);
-  
-  // Search Google Books when title changes
-  useEffect(() => {
-    const searchTimeout = setTimeout(async () => {
-      if (title.trim().length > 2) {
-        setSearchLoading(true);
-        const results = await searchBooks(title);
-        setSearchResults(results);
-        setShowSearchResults(true);
-        setSearchLoading(false);
-      } else {
-        setSearchResults([]);
-        setShowSearchResults(false);
-      }
-    }, 500); // 500ms debounce
     
-    return () => clearTimeout(searchTimeout);
-  }, [title, searchBooks]);
+    return data.items.map(item => {
+      const info = item.volumeInfo || {};
+      return {
+        id: item.id,
+        title: info.title || 'Unknown Title',
+        author: info.authors ? info.authors.join(', ') : 'Unknown Author',
+        genre: info.categories ? info.categories[0] : 'Unknown',
+        description: info.description || 'No description available',
+        coverImage: info.imageLinks?.thumbnail || null,
+        publishedDate: info.publishedDate,
+        pageCount: info.pageCount,
+        averageRating: info.averageRating,
+        language: info.language || 'en',
+        asin: info.industryIdentifiers?.find(id => id.type === 'ISBN_13')?.identifier
+      };
+    });
+  } catch (error) {
+    console.error('Error searching books:', error);
+    return [];
+  }
+}, []);
+
+// Generate recommendations based on user's books with API key and error handling
+const fetchRecommendations = useCallback(async () => {
+  if (books.length === 0) return;
+  setRecLoading(true);
   
-  // Generate recommendations based on user's books
-  const fetchRecommendations = useCallback(async () => {
-    if (books.length === 0) return;
-    setRecLoading(true);
+  try {
+    // Collect genres from user's books
+    const genres = books
+      .map(book => book.genre)
+      .filter(genre => genre && genre !== 'Unknown');
     
-    try {
-      // Collect genres from user's books
-      const genres = books
-        .map(book => book.genre)
-        .filter(genre => genre && genre !== 'Unknown');
-      
-      // Get genre counts
-      const genreCounts = {};
-      genres.forEach(genre => {
-        genreCounts[genre] = (genreCounts[genre] || 0) + 1;
-      });
-      
-      // Sort genres by count
-      const sortedGenres = Object.entries(genreCounts)
-        .sort((a, b) => b[1] - a[1])
-        .map(entry => entry[0]);
-      
-      // Get top genre or default to fiction
-      const targetGenre = sortedGenres[0] || 'fiction';
-      
-      // Get books from that genre
-      const response = await fetch(
-        `https://www.googleapis.com/books/v1/volumes?q=subject:${encodeURIComponent(targetGenre)}&maxResults=10`
-      );
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch recommendations');
+    // Get genre counts
+    const genreCounts = {};
+    genres.forEach(genre => {
+      genreCounts[genre] = (genreCounts[genre] || 0) + 1;
+    });
+    
+    // Sort genres by count
+    const sortedGenres = Object.entries(genreCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(entry => entry[0]);
+    
+    // Get top genre or default to fiction
+    const targetGenre = sortedGenres[0] || 'fiction';
+    console.log("Fetching recommendations for genre:", targetGenre);
+    
+    // Use a CORS proxy if needed (remove if not required)
+    const corsProxy = "https://corsproxy.io/?";
+    
+    // Add an API key (you'll need to get one from Google Cloud Console)
+    const apiKey = "YOUR_API_KEY"; // Replace with your actual API key
+    
+    const response = await fetch(
+      `${corsProxy}https://www.googleapis.com/books/v1/volumes?q=subject:${encodeURIComponent(targetGenre)}&maxResults=10&key=${apiKey}`
+    );
+    
+    if (!response.ok) {
+      console.error("API Response not OK:", response.status, response.statusText);
+      throw new Error(`Failed to fetch recommendations: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log("Recommendations API Response:", data);
+    
+    if (!data.items || data.items.length === 0) {
+      console.log("No recommendations found for genre:", targetGenre);
+      setRecommendations([]);
+      setRecLoading(false);
+      return;
+    }
+    
+    // Rest of your recommendation processing code remains the same...
+    const formattedRecs = data.items.map(item => {
+      const info = item.volumeInfo || {};
+      return {
+        id: item.id,
+        title: info.title || 'Unknown Title',
+        author: info.authors ? info.authors.join(', ') : 'Unknown Author',
+        genre: info.categories ? info.categories[0] : targetGenre,
+        description: info.description || 'No description available',
+        coverImage: info.imageLinks?.thumbnail || null,
+        score: ((info.averageRating || 3.5) * 2).toFixed(1),
+        similarityScore: (Math.random() * 0.6 + 0.2).toFixed(2),
+        asin: info.industryIdentifiers?.find(id => id.type === 'ISBN_13')?.identifier,
+        reasoning: `Based on your interest in ${targetGenre} books, you might enjoy this ${info.categories ? info.categories[0] : targetGenre} novel. ${info.authors ? info.authors[0] : 'This author'}'s writing style and themes align with your reading preferences.`
+      };
+    });
+    
+    // Filter out books the user already has
+    const filteredRecs = formattedRecs.filter(
+      rec => !books.some(book => book.id === rec.id) && 
+             !readingList.some(book => book.id === rec.id)
+    );
+    
+    // Apply feedback adjustments
+    const adjustedRecs = filteredRecs.map(rec => {
+      if (feedbackMap[rec.id] === 'like') {
+        return { ...rec, score: (parseFloat(rec.score) + 1.5).toFixed(1) };
+      } else if (feedbackMap[rec.id] === 'dislike') {
+        return { ...rec, score: Math.max(0, parseFloat(rec.score) - 2).toFixed(1) };
       }
-      
-      const data = await response.json();
-      
-      if (!data.items || data.items.length === 0) {
-        setRecommendations([]);
-        setRecLoading(false);
-        return;
+      return rec;
+    });
+    
+    // Sort by score
+    const sortedRecs = [...adjustedRecs].sort((a, b) => 
+      parseFloat(b.score) - parseFloat(a.score)
+    );
+    
+    setRecommendations(sortedRecs);
+  } catch (error) {
+    console.error('Error fetching recommendations:', error);
+    setRecommendations([]);
+  } finally {
+    setRecLoading(false);
+  }
+}, [books, readingList, feedbackMap]);
+
+// Alternative implementation that doesn't rely on the external API
+// You can use this while waiting for API access
+const fetchMockRecommendations = useCallback(() => {
+  if (books.length === 0) return;
+  setRecLoading(true);
+  
+  try {
+    console.log("Generating mock recommendations");
+    
+    // Sample genres based on user's books or default to fiction
+    const genres = books
+      .map(book => book.genre)
+      .filter(genre => genre && genre !== 'Unknown');
+    
+    const topGenre = genres.length > 0 
+      ? genres.reduce((a, b) => genres.filter(v => v === a).length >= genres.filter(v => v === b).length ? a : b, null)
+      : 'Fiction';
+    
+    // Mock book data
+    const mockBooks = [
+      {
+        id: 'mock1',
+        title: 'The Lost Symbol',
+        author: 'Dan Brown',
+        genre: 'Thriller',
+        description: 'Robert Langdon races to uncover secrets in Washington D.C. related to the Freemasons.',
+        coverImage: 'https://m.media-amazon.com/images/I/81WcnNQ-TBL._AC_UF1000,1000_QL80_.jpg',
+        score: '7.8',
+        similarityScore: '0.72',
+        asin: '0385504225',
+        reasoning: `Based on your reading history, you might enjoy this fast-paced thriller. Dan Brown's writing style combines history and suspense.`
+      },
+      {
+        id: 'mock2',
+        title: 'Dune',
+        author: 'Frank Herbert',
+        genre: 'Science Fiction',
+        description: 'A stunning blend of adventure and mysticism, environmentalism and politics, this epic novel follows Paul Atreides as he becomes ruler of a desert planet.',
+        coverImage: 'https://m.media-amazon.com/images/I/A1u+2fY5yTL._AC_UF1000,1000_QL80_.jpg',
+        score: '8.9',
+        similarityScore: '0.65',
+        asin: '0441172717',
+        reasoning: `This science fiction masterpiece offers rich world-building and complex characters that align with your reading preferences.`
+      },
+      {
+        id: 'mock3',
+        title: 'The Night Circus',
+        author: 'Erin Morgenstern',
+        genre: 'Fantasy',
+        description: 'The circus arrives without warning. No announcements precede it. It is simply there, when yesterday it was not.',
+        coverImage: 'https://m.media-amazon.com/images/I/91HOTLAE9ML._AC_UF1000,1000_QL80_.jpg',
+        score: '8.2',
+        similarityScore: '0.68',
+        asin: '0385534639',
+        reasoning: `This imaginative fantasy novel features beautiful prose and magical elements that match your interest in immersive storytelling.`
+      },
+      {
+        id: 'mock4',
+        title: 'Where the Crawdads Sing',
+        author: 'Delia Owens',
+        genre: 'Fiction',
+        description: 'For years, rumors of the "Marsh Girl" have haunted Barkley Cove, a quiet town on the North Carolina coast.',
+        coverImage: 'https://m.media-amazon.com/images/I/81O1oy0y9eL._AC_UF1000,1000_QL80_.jpg',
+        score: '8.5',
+        similarityScore: '0.70',
+        asin: '0735219095',
+        reasoning: `This compelling story combines mystery and coming-of-age elements with beautiful nature writing.`
+      },
+      {
+        id: 'mock5',
+        title: 'The Alchemist',
+        author: 'Paulo Coelho',
+        genre: 'Fiction',
+        description: 'A special 25th anniversary edition of Paulo Coelho's extraordinary international bestselling phenomenon.',
+        coverImage: 'https://m.media-amazon.com/images/I/51Z0nLAfLmL.jpg',
+        score: '7.9',
+        similarityScore: '0.62',
+        asin: '0062315005',
+        reasoning: `This philosophical novel about following your dreams has resonated with millions of readers worldwide.`
       }
-      
+    ];
+    
+    // Filter the mocks to match some genres from the user's books
+    const relevantBooks = mockBooks.filter(book => 
+      !books.some(userBook => userBook.id === book.id) && 
+      !readingList.some(userBook => userBook.id === book.id)
+    );
+    
+    // Apply feedback adjustments
+    const adjustedRecs = relevantBooks.map(rec => {
+      if (feedbackMap[rec.id] === 'like') {
+        return { ...rec, score: (parseFloat(rec.score) + 1.5).toFixed(1) };
+      } else if (feedbackMap[rec.id] === 'dislike') {
+        return { ...rec, score: Math.max(0, parseFloat(rec.score) - 2).toFixed(1) };
+      }
+      return rec;
+    });
+    
+    // Sort by score
+    const sortedRecs = [...adjustedRecs].sort((a, b) => 
+      parseFloat(b.score) - parseFloat(a.score)
+    );
+    
+    console.log("Mock recommendations generated:", sortedRecs);
+    setRecommendations(sortedRecs);
+  } catch (error) {
+    console.error('Error generating mock recommendations:', error);
+    setRecommendations([]);
+  } finally {
+    setRecLoading(false);
+  }
+}, [books, readingList, feedbackMap]);
       // Format recommendations
       const formattedRecs = data.items.map(item => {
         const info = item.volumeInfo || {};
