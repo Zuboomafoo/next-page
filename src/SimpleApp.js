@@ -893,7 +893,7 @@ function SimpleApp() {
                 </button>
                 {recommendations.find(book => book.id === showReason)?.asin && (
                   
-                    href={getAmazonLink(recommendations.find(book => book.id === showReason).asin)}
+                    href={getAmazonLink(recommendations,find(book => book.id === showReason).asin)}
                     target="_blank" 
                     rel="noreferrer noopener"
                     className="btn btn-warning"
