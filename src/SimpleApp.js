@@ -322,7 +322,7 @@ function SimpleApp() {
   // Generate Amazon affiliate link
   const getAmazonLink = (asin) => {
     if (!asin) return '#';
-    return `https://www.amazon.com/dp/${asin}?tag=youraffiliatetaghere-20`;
+    return `https://www.amazon.com/dp/${asin}?tag=zuboomafoo-20`;
   };
   
   // Select a book from search results
@@ -892,8 +892,8 @@ function SimpleApp() {
                   Close
                 </button>
                 {recommendations.find(book => book.id === showReason)?.asin && (
-                  
-                    href={getAmazonLink(recommendations,find(book => book.id === showReason).asin)}
+                  <a
+                    href={getAmazonLink(recommendations.find(book => book.id === showReason).asin)}
                     target="_blank" 
                     rel="noreferrer noopener"
                     className="btn btn-warning"
