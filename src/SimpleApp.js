@@ -293,7 +293,7 @@ const fetchMockRecommendations = useCallback(() => {
         title: 'The Alchemist',
         author: 'Paulo Coelho',
         genre: 'Fiction',
-        description: 'A special 25th anniversary edition of Paulo Coelho's extraordinary international bestselling phenomenon.',
+        description: "A special 25th anniversary edition of Paulo Coelho's extraordinary international bestselling phenomenon.",
         coverImage: 'https://m.media-amazon.com/images/I/51Z0nLAfLmL.jpg',
         score: '7.9',
         similarityScore: '0.62',
