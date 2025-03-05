@@ -148,11 +148,11 @@ const searchBooks = useCallback(async (query) => {
 
 // Search Google Books when title changes
 useEffect(() => {
+  // Only run search if title has changed due to user typing (not from selection)
   const searchTimeout = setTimeout(async () => {
     // Skip search if preventSearch is true
     if (preventSearch) {
-      setPreventSearch(false);
-      return;
+      return; // Don't reset preventSearch here
     }
     
     if (title.trim().length > 2) {
@@ -238,21 +238,25 @@ const fetchRecommendations = useCallback(async () => {
       };
     });
     
-    // Filter out books the user already has
-    const filteredRecs = formattedRecs.filter(
-      rec => !books.some(book => book.id === rec.id) && 
-             !readingList.some(book => book.id === rec.id)
-    );
-    
-    // Apply feedback adjustments
-    const adjustedRecs = filteredRecs.map(rec => {
-      if (feedbackMap[rec.id] === 'like') {
-        return { ...rec, score: (parseFloat(rec.score) + 1.5).toFixed(1) };
-      } else if (feedbackMap[rec.id] === 'dislike') {
-        return { ...rec, score: Math.max(0, parseFloat(rec.score) - 2).toFixed(1) };
-      }
-      return rec;
-    });
+    // Get current book and reading list IDs for filtering
+const currentBookIds = books.map(book => book.id);
+const currentReadingListIds = readingList.map(book => book.id);
+
+// Filter out books the user already has
+const filteredRecs = formattedRecs.filter(
+  rec => !currentBookIds.includes(rec.id) && !currentReadingListIds.includes(rec.id)
+);
+
+// Apply feedback adjustments based on current feedbackMap
+const currentFeedbackMap = {...feedbackMap};
+const adjustedRecs = filteredRecs.map(rec => {
+  if (currentFeedbackMap[rec.id] === 'like') {
+    return { ...rec, score: (parseFloat(rec.score) + 1.5).toFixed(1) };
+  } else if (currentFeedbackMap[rec.id] === 'dislike') {
+    return { ...rec, score: Math.max(0, parseFloat(rec.score) - 2).toFixed(1) };
+  }
+  return rec;
+});
     
     // Sort by score
     const sortedRecs = [...adjustedRecs].sort((a, b) => 
@@ -266,10 +270,11 @@ const fetchRecommendations = useCallback(async () => {
   } finally {
     setRecLoading(false);
   }
-}, [books, readingList, feedbackMap]);
+}, []);
 
 // Fetch recommendations when books or reading list change
 useEffect(() => {
+  // This will now trigger whenever books, readingList, or feedbackMap changes
   fetchRecommendations();
 }, [books, readingList, feedbackMap, fetchRecommendations]);
   
@@ -421,8 +426,8 @@ useEffect(() => {
     ? (books.reduce((sum, book) => sum + (book.rating || 0), 0) / books.length).toFixed(1) 
     : 0;
   
-// Memoized top genre calculation
-const getTopGenre = useMemo(() => {
+// Calculate top genre (as a function, not memoized value)
+const getTopGenre = () => {
   const genres = books.map(book => book.genre).filter(g => g && g !== 'Unknown');
   if (genres.length === 0) return 'N/A';
   
@@ -442,7 +447,7 @@ const getTopGenre = useMemo(() => {
   }
   
   return topGenre || 'N/A';
-}, [books]);
+};
   
   // Star rating component
   const StarRating = ({ value, onChange, size = "normal" }) => {
@@ -551,13 +556,25 @@ const getTopGenre = useMemo(() => {
             <div className="mb-3 position-relative">
               <label className="form-label">Book Title</label>
               <input 
-                type="text" 
-                className="form-control" 
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Search for a book title"
-                ref={searchInputRef}
-              />
+  type="text" 
+  className="form-control" 
+  value={title}
+  onChange={(e) => {
+    setTitle(e.target.value);
+    // User is typing, so reset preventSearch flag
+    if (preventSearch) {
+      setPreventSearch(false);
+    }
+  }}
+  onFocus={() => {
+    // Only show search results if user is typing something new
+    if (title.trim().length > 2 && !preventSearch) {
+      setShowSearchResults(true);
+    }
+  }}
+  placeholder="Search for a book title"
+  ref={searchInputRef}
+/>
               
               {searchLoading && (
                 <div className="mt-1 text-secondary small">Searching books...</div>
