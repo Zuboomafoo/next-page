@@ -12,6 +12,11 @@ function SimpleApp() {
   const [searchResults, setSearchResults] = useState([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
+ 
+ // State for preventing search on form submit
+  const [preventSearch, setPreventSearch] = useState(false);
+  const searchResultsRef = useRef(null);
+  const searchInputRef = useRef(null);
   
   // State for recommendations
   const [recommendations, setRecommendations] = useState([]);
@@ -71,6 +76,25 @@ function SimpleApp() {
   useEffect(() => {
     localStorage.setItem('nextpage_feedback', JSON.stringify(feedbackMap));
   }, [feedbackMap]);
+
+  // Handling clicks outside the search results
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (
+        searchResultsRef.current && 
+        !searchResultsRef.current.contains(event.target) &&
+        searchInputRef.current && 
+        !searchInputRef.current.contains(event.target)
+      ) {
+        setShowSearchResults(false);
+      }
+    }
+  
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
   
 // Google Books API search function with API key and error handling
 const searchBooks = useCallback(async (query) => {
@@ -122,7 +146,31 @@ const searchBooks = useCallback(async (query) => {
   }
 }, []);
 
-// Generate recommendations based on user's books with API key and error handling
+// Search Google Books when title changes
+useEffect(() => {
+  const searchTimeout = setTimeout(async () => {
+    // Skip search if preventSearch is true
+    if (preventSearch) {
+      setPreventSearch(false);
+      return;
+    }
+    
+    if (title.trim().length > 2) {
+      setSearchLoading(true);
+      const results = await searchBooks(title);
+      setSearchResults(results);
+      setShowSearchResults(true);
+      setSearchLoading(false);
+    } else {
+      setSearchResults([]);
+      setShowSearchResults(false);
+    }
+  }, 500); // 500ms debounce
+  
+  return () => clearTimeout(searchTimeout);
+}, [title, searchBooks, preventSearch]);
+
+// Generate recommendations based on user's books
 const fetchRecommendations = useCallback(async () => {
   if (books.length === 0) return;
   setRecLoading(true);
@@ -152,7 +200,7 @@ const fetchRecommendations = useCallback(async () => {
     const corsProxy = "https://corsproxy.io/?";
     
     // Add an API key (you'll need to get one from Google Cloud Console)
-    const apiKey = "YOUR_API_KEY"; // Replace with your actual API key
+    const apiKey = "AIzaSyDo8wQLqk9-W0XgnhjFmGSxfAY_FVOyXJg"; 
     
     const response = await fetch(
       `${corsProxy}https://www.googleapis.com/books/v1/volumes?q=subject:${encodeURIComponent(targetGenre)}&maxResults=10&key=${apiKey}`
@@ -490,6 +538,7 @@ const searchBooks = useCallback(async (query) => {
     setTitle(book.title);
     setAuthor(book.author);
     setShowSearchResults(false);
+    setPreventSearch(true); 
   };
   
   // Handle book form submission
@@ -672,7 +721,7 @@ const searchBooks = useCallback(async (query) => {
               )}
               
               {showSearchResults && searchResults.length > 0 && (
-                <div className="position-absolute w-100 mt-1 bg-white border rounded shadow-sm" style={{zIndex: 1000, maxHeight: '300px', overflow: 'auto'}}>
+                <div ref={searchResultsRef} className="position-absolute w-100 mt-1 bg-white border rounded shadow-sm" style={{zIndex: 1000, maxHeight: '300px', overflow: 'auto'}}>
                   {searchResults.map(book => (
                     <div 
                       key={book.id}
@@ -703,9 +752,10 @@ const searchBooks = useCallback(async (query) => {
               <input 
                 type="text" 
                 className="form-control" 
-                value={author}
-                onChange={(e) => setAuthor(e.target.value)}
-                placeholder="Enter author name"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Search for a book title"
+                ref={searchInputRef}
               />
             </div>
             
